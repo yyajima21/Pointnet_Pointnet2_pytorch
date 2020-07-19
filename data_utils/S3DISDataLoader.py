@@ -20,9 +20,13 @@ class S3DISDataset(Dataset):
         num_point_all = []
         labelweights = np.zeros(13)
         for room_name in rooms_split:
+            #print("room_name: {}".format(room_name))
             room_path = os.path.join(data_root, room_name)
+            #print("room_path: {}".format(room_path))
             room_data = np.load(room_path)  # xyzrgbl, N*7
-            points, labels = room_data[:, 0:6], room_data[:, 6]  # xyzrgb, N*6; l, N
+            #print("room_data: {}".format(room_data.shape))
+            #points, labels = room_data[:, 0:6], room_data[:, 6]  # xyzrgb, N*6; l, N
+            points, labels = room_data[:, 0:3], room_data[:, 3]  # xyzrgb, N*6; l, N
             tmp, _ = np.histogram(labels, range(14))
             labelweights += tmp
             coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
@@ -52,7 +56,8 @@ class S3DISDataset(Dataset):
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
             block_max = center + [self.block_size / 2.0, self.block_size / 2.0, 0]
             point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1] >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
-            if point_idxs.size > 1024:
+            #if point_idxs.size > 1024:
+            if point_idxs.size > 8:
                 break
 
         if point_idxs.size >= self.num_point:
@@ -68,8 +73,8 @@ class S3DISDataset(Dataset):
         current_points[:, 8] = selected_points[:, 2] / self.room_coord_max[room_idx][2]
         selected_points[:, 0] = selected_points[:, 0] - center[0]
         selected_points[:, 1] = selected_points[:, 1] - center[1]
-        selected_points[:, 3:6] /= 255.0
-        current_points[:, 0:6] = selected_points
+        #selected_points[:, 3:6] /= 255.0 # no rgb value
+        current_points[:, 0:3] = selected_points
         current_labels = labels[selected_point_idxs]
         if self.transform is not None:
             current_points, current_labels = self.transform(current_points, current_labels)

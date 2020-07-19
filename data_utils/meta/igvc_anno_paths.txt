@@ -1,0 +1,6 @@
+Area_1/save_annotation_data_2.pcd/Annotations
+Area_1/save_annotation_data_3.pcd/Annotations
+Area_1/save_annotation_data_4.pcd/Annotations
+Area_1/save_annotation_data_8.pcd/Annotations
+Area_2/save_annotation_data_9.pcd/Annotations
+Area_2/save_annotation_data_10.pcd/Annotations
