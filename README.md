@@ -1,17 +1,20 @@
 # Pytorch Implementation of PointNet and PointNet++ 
 
 This repo is implementation for [PointNet](http://openaccess.thecvf.com/content_cvpr_2017/papers/Qi_PointNet_Deep_Learning_CVPR_2017_paper.pdf) and [PointNet++](http://papers.nips.cc/paper/7095-pointnet-deep-hierarchical-feature-learning-on-point-sets-in-a-metric-space.pdf) in pytorch.
-
+I modified the original code to have a custom training feature that has less than 13 classes. Note that this modification only applies to semantic scene segmentation model.
 ## Update
-**2019/11/26:**
-
-(1) Fixed some errors in previous codes and added data augmentation tricks. Now classification by only 1024 points can achieve 92.8\%! 
-
-(2) Added testing codes, including classification and segmentation, and semantic segmentation with visualization. 
-
-(3) Organized all models into `./models` files for easy using.
-
-
+**2020/8/23**
+The following inctruction contains how to run sementic segmentation on custom training dataset.
+### Data Preparation
+Please download your custom dataset and create a folder called "data". Add your custom data to the data folder.
+### Install Dependencies
+```$ pip install -r requirements.txt```
+### Run
+```
+## Note: adding --visual will save a file that can be viewed in the meshlab app. Defaut training epoch is 100
+python train_semseg.py --model pointnet2_sem_seg --test_area 1 --log_dir pointnet_sem_seg
+python test_semseg.py --log_dir pointnet2_sem_seg --test_area 1 --visual
+```
 ## Classification
 ### Data Preparation
 Download alignment **ModelNet** [here](https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip) and save in `data/modelnet40_normal_resampled/`.
