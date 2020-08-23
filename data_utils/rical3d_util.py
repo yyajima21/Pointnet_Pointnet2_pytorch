@@ -7,10 +7,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 
-DATA_PATH = os.path.join(ROOT_DIR, 'data','IGVC3dDataset')
-g_classes = [x.rstrip() for x in open(os.path.join(BASE_DIR, 'meta/igvc_class_names.txt'))]
+DATA_PATH = os.path.join(ROOT_DIR, 'data','rical3dDataset')
+g_classes = [x.rstrip() for x in open(os.path.join(BASE_DIR, 'meta/rical_class_names.txt'))]
 g_class2label = {cls: i for i,cls in enumerate(g_classes)}
-g_class2color = {'barrel':	[0,255,0]} 
+g_class2color = {'ceiling':	[0,255,0],
+                 'floor':	[0,0,255],
+                 'wall':	[0,255,255]} 
 g_easy_view_labels = [7,8,9,10,11,1]
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 

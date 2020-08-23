@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.pointnet_util import PointNetSetAbstraction,PointNetFeaturePropagation
@@ -8,7 +9,7 @@ class get_model(nn.Module):
         super(get_model, self).__init__()
         # change the self.sa1's input
         #self.sa1 = PointNetSetAbstraction(1024, 0.1, 32, 9 + 3, [32, 32, 64], False)
-        self.sa1 = PointNetSetAbstraction(1024, 0.1, 1, 9 + 3, [32, 32, 64], False)
+        self.sa1 = PointNetSetAbstraction(1024, 0.1, 1, 6 + 3, [32, 32, 64], False)
         self.sa2 = PointNetSetAbstraction(256, 0.2, 32, 64 + 3, [64, 64, 128], False)
         self.sa3 = PointNetSetAbstraction(64, 0.4, 32, 128 + 3, [128, 128, 256], False)
         self.sa4 = PointNetSetAbstraction(16, 0.8, 32, 256 + 3, [256, 256, 512], False)
@@ -51,7 +52,7 @@ class get_loss(nn.Module):
         return total_loss
 
 if __name__ == '__main__':
-    import  torch
+    #import  torch
     model = get_model(13)
     xyz = torch.rand(6, 9, 2048)
-    (model(xyz))
+    print(model(xyz))

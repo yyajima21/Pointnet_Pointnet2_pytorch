@@ -1,0 +1,3 @@
+ceiling
+floor
+wall

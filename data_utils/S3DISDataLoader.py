@@ -18,7 +18,8 @@ class S3DISDataset(Dataset):
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
         num_point_all = []
-        labelweights = np.zeros(13)
+        #labelweights = np.zeros(13)
+        labelweights = np.zeros(3)
         for room_name in rooms_split:
             #print("room_name: {}".format(room_name))
             room_path = os.path.join(data_root, room_name)
@@ -27,7 +28,8 @@ class S3DISDataset(Dataset):
             #print("room_data: {}".format(room_data.shape))
             #points, labels = room_data[:, 0:6], room_data[:, 6]  # xyzrgb, N*6; l, N
             points, labels = room_data[:, 0:3], room_data[:, 3]  # xyzrgb, N*6; l, N
-            tmp, _ = np.histogram(labels, range(14))
+            #tmp, _ = np.histogram(labels, range(14))
+            tmp, _ = np.histogram(labels,range(4))
             labelweights += tmp
             coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
             self.room_points.append(points), self.room_labels.append(labels)
@@ -56,8 +58,8 @@ class S3DISDataset(Dataset):
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
             block_max = center + [self.block_size / 2.0, self.block_size / 2.0, 0]
             point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1] >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
-            #if point_idxs.size > 1024:
-            if point_idxs.size > 8:
+            if point_idxs.size > 64:
+            #if point_idxs.size > 8:
                 break
 
         if point_idxs.size >= self.num_point:
@@ -67,13 +69,23 @@ class S3DISDataset(Dataset):
 
         # normalize
         selected_points = points[selected_point_idxs, :]  # num_point * 6
+        """
+        current_points = np.zeros((self.num_point, 6))  # num_point * 9
+        current_points[:, 3] = selected_points[:, 0] / self.room_coord_max[room_idx][0]
+        current_points[:, 4] = selected_points[:, 1] / self.room_coord_max[room_idx][1]
+        current_points[:, 5] = selected_points[:, 2] / self.room_coord_max[room_idx][2]
+        selected_points[:, 0] = selected_points[:, 0] - center[0]
+        selected_points[:, 1] = selected_points[:, 1] - center[1]
+        """
+        
         current_points = np.zeros((self.num_point, 9))  # num_point * 9
         current_points[:, 6] = selected_points[:, 0] / self.room_coord_max[room_idx][0]
         current_points[:, 7] = selected_points[:, 1] / self.room_coord_max[room_idx][1]
         current_points[:, 8] = selected_points[:, 2] / self.room_coord_max[room_idx][2]
         selected_points[:, 0] = selected_points[:, 0] - center[0]
         selected_points[:, 1] = selected_points[:, 1] - center[1]
-        #selected_points[:, 3:6] /= 255.0 # no rgb value
+        selected_points[:, 3:6] /= 255.0 # no rgb value
+        
         current_points[:, 0:3] = selected_points
         current_labels = labels[selected_point_idxs]
         if self.transform is not None:
@@ -104,15 +116,15 @@ class ScannetDatasetWholeScene():
         for file in self.file_list:
             data = np.load(root + file)
             points = data[:, :3]
-            self.scene_points_list.append(data[:, :6])
-            self.semantic_labels_list.append(data[:, 6])
+            self.scene_points_list.append(data[:, :3])
+            self.semantic_labels_list.append(data[:, 3])
             coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
 
-        labelweights = np.zeros(13)
+        labelweights = np.zeros(3)
         for seg in self.semantic_labels_list:
-            tmp, _ = np.histogram(seg, range(14))
+            tmp, _ = np.histogram(seg, range(4))
             self.scene_points_num.append(seg.shape[0])
             labelweights += tmp
         labelweights = labelweights.astype(np.float32)
