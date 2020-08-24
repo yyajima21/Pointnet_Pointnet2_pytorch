@@ -27,11 +27,13 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=1, help='batch size in testing [default: 32]')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--num_point', type=int, default=1024, help='Point Number [default: 4096]')
-    parser.add_argument('--log_dir', type=str, default='pointnet_sem_seg', help='Experiment root')
+    #parser.add_argument('--log_dir', type=str, default='pointnet_sem_seg', help='Experiment root')
+    parser.add_argument('--log_dir', type=str, default='pointnet_igvc', help='Experiment root')
     parser.add_argument('--visual', action='store_true', default=True, help='Whether visualize result [default: False]')
     parser.add_argument('--test_area', type=int, default=1, help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5, help='Aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--mode', type=str, default='rical', help='mode [default: rical]')
+    #parser.add_argument('--mode', type=str, default='rical', help='mode [default: rical]')
+    parser.add_argument('--mode', type=str, default='igvc', help='mode [default: rical]')
     return parser.parse_args()
 
 def add_vote(vote_label_pool, point_idx, pred_label, weight):
@@ -141,7 +143,7 @@ def main(args):
                     torch_data = torch.Tensor(batch_data)
                     torch_data= torch_data.float().cuda()
                     torch_data = torch_data.transpose(2, 1)
-                    if args.log_dir == "pointnet_sem_seg":
+                    if args.log_dir == "pointnet_sem_seg" or args.log_dir == "pointnet_igvc":
                         torch_data = torch_data[:,:3,:]
                     seg_pred, _ = classifier(torch_data)
                     batch_pred_label = seg_pred.contiguous().cpu().data.max(2)[1].numpy()

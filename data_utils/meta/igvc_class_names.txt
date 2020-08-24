@@ -1,4 +1,3 @@
 barrel
 car
 person
-other
