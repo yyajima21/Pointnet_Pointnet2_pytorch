@@ -22,16 +22,6 @@ ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
 
-#classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
-#classes = ['person','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
-classes = ['ceiling','floor','wall']
-class2label = {cls: i for i,cls in enumerate(classes)}
-seg_classes = class2label
-seg_label_to_cat = {}
-for i,cat in enumerate(seg_classes.keys()):
-    seg_label_to_cat[i] = cat
-
-
 def parse_args():
     parser = argparse.ArgumentParser('Model')
     parser.add_argument('--model', type=str, default='pointnet_sem_seg', help='model name [default: pointnet_sem_seg]')
@@ -46,10 +36,24 @@ def parse_args():
     parser.add_argument('--step_size', type=int,  default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float,  default=0.7, help='Decay rate for lr decay [default: 0.7]')
     parser.add_argument('--test_area', type=int, default=2, help='Which area to use for test, option: 1-6 [default: 5]')
+    parser.add_argument('--mode', type=str, default='rical', help='mode [default: rical]')
 
     return parser.parse_args()
 
 def main(args):
+    # obtain class
+    if args.mode == "rical":
+        classes = ['ceiling','floor','wall']
+        root = 'data/rical_indoor3d/'
+    elif args.mode == "igvc":
+        classes = ['barrel','car','person']
+        root = 'data/igvc_indoor3d/'
+    class2label = {cls: i for i,cls in enumerate(classes)}
+    seg_classes = class2label
+    seg_label_to_cat = {}
+    for i,cat in enumerate(seg_classes.keys()):
+        seg_label_to_cat[i] = cat
+    
     def log_string(str):
         logger.info(str)
         print(str)
@@ -85,16 +89,15 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    root = 'data/rical_indoor3d/'
-    NUM_CLASSES = 3 # originally 13
+    NUM_CLASSES = len(classes)
     NUM_POINT = args.npoint
     BATCH_SIZE = args.batch_size
 
 
     print("start loading training data ...")
-    TRAIN_DATASET = S3DISDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None)
+    TRAIN_DATASET = S3DISDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_class=NUM_CLASSES)
     print("start loading test data ...")
-    TEST_DATASET = S3DISDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None)
+    TEST_DATASET = S3DISDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_class=NUM_CLASSES)
     trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=0, pin_memory=True, drop_last=True, worker_init_fn = lambda x: np.random.seed(x+int(time.time())))
     testDataLoader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=True, drop_last=True)
     weights = torch.Tensor(TRAIN_DATASET.labelweights).cuda()
@@ -168,7 +171,7 @@ def main(args):
         total_correct = 0
         total_seen = 0
         loss_sum = 0
-        # TODO:code stops here. the line below is not working.
+
         for i, data in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
         #for i, data in enumerate(trainDataLoader):
             points, target = data

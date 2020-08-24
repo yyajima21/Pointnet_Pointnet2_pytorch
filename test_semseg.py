@@ -5,7 +5,8 @@ Date: Nov 2019
 import argparse
 import os
 from data_utils.S3DISDataLoader import ScannetDatasetWholeScene
-from data_utils.rical3d_util import g_label2color
+from data_utils.rical3d_util import g_label2color as g_label2color_rical
+from data_utils.igvc3d_util import g_label2color as g_label2color_igvc
 import torch
 import logging
 from pathlib import Path
@@ -19,12 +20,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
-classes = ['ceiling','floor','wall']
-class2label = {cls: i for i,cls in enumerate(classes)}
-seg_classes = class2label
-seg_label_to_cat = {}
-for i,cat in enumerate(seg_classes.keys()):
-    seg_label_to_cat[i] = cat
 
 def parse_args():
     '''PARAMETERS'''
@@ -33,9 +28,10 @@ def parse_args():
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--num_point', type=int, default=1024, help='Point Number [default: 4096]')
     parser.add_argument('--log_dir', type=str, default='pointnet_sem_seg', help='Experiment root')
-    parser.add_argument('--visual', action='store_true', default=False, help='Whether visualize result [default: False]')
+    parser.add_argument('--visual', action='store_true', default=True, help='Whether visualize result [default: False]')
     parser.add_argument('--test_area', type=int, default=1, help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5, help='Aggregate segmentation scores with voting [default: 5]')
+    parser.add_argument('--mode', type=str, default='rical', help='mode [default: rical]')
     return parser.parse_args()
 
 def add_vote(vote_label_pool, point_idx, pred_label, weight):
@@ -51,6 +47,19 @@ def main(args):
     def log_string(str):
         logger.info(str)
         print(str)
+
+    # obtain class
+    if args.mode == "rical":
+        classes = ['ceiling','floor','wall']
+        root = 'data/rical_indoor3d/'
+    elif args.mode == "igvc":
+        classes = ['barrel','car','person']
+        root = 'data/igvc_indoor3d/'
+    class2label = {cls: i for i,cls in enumerate(classes)}
+    seg_classes = class2label
+    seg_label_to_cat = {}
+    for i,cat in enumerate(seg_classes.keys()):
+        seg_label_to_cat[i] = cat
 
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -71,13 +80,12 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    NUM_CLASSES = 3
+    NUM_CLASSES = len(classes)
     BATCH_SIZE = args.batch_size
     NUM_POINT = args.num_point
 
-    root = 'data/rical_indoor3d/'
 
-    TEST_DATASET_WHOLE_SCENE = ScannetDatasetWholeScene(root, split='test', test_area=args.test_area, block_points=NUM_POINT)
+    TEST_DATASET_WHOLE_SCENE = ScannetDatasetWholeScene(root, split='test', test_area=args.test_area, block_points=NUM_POINT, num_point=NUM_POINT)
     log_string("The number of test data is: %d" %  len(TEST_DATASET_WHOLE_SCENE))
 
     '''MODEL LOADING'''
@@ -165,8 +173,12 @@ def main(args):
                     pl_save.write(str(int(i)) + '\n')
                 pl_save.close()
             for i in range(whole_scene_label.shape[0]):
-                color = g_label2color[pred_label[i]]
-                color_gt = g_label2color[whole_scene_label[i]]
+                if args.mode == "rical":
+                    color = g_label2color_rical[pred_label[i]]
+                    color_gt = g_label2color_rical[whole_scene_label[i]]
+                elif args.mode == "igvc":
+                    color = g_label2color_igvc[pred_label[i]]
+                    color_gt = g_label2color_igvc[whole_scene_label[i]]
                 if args.visual:
                     fout.write('v %f %f %f %d %d %d\n' % (
                     whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], color[0], color[1],
