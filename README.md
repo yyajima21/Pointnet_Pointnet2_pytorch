@@ -12,8 +12,8 @@ Please download your custom dataset and create a folder called "data". Add your 
 ### Run
 ```
 ## Note: adding --visual will save a file that can be viewed in the meshlab app. Defaut training epoch is 100
-python train_semseg.py --model pointnet2_sem_seg --test_area 1 --log_dir pointnet_sem_seg
-python test_semseg.py --log_dir pointnet2_sem_seg --test_area 1 --visual
+python train_semseg.py --model pointnet_sem_seg --test_area 1 --log_dir pointnet_sem_seg
+python test_semseg.py --log_dir pointnet_sem_seg --test_area 1 --visual
 ```
 ## Classification
 ### Data Preparation
