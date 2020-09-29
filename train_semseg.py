@@ -16,23 +16,36 @@ from tqdm import tqdm
 import provider
 import numpy as np
 import time
+from torch.utils.tensorboard import SummaryWriter
+import torchvision
+from collections import defaultdict
+from collections import OrderedDict
+from collections import namedtuple
+from itertools import product
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
+# hyperparameter tuning class
+class HyperParameters:
+    @staticmethod
+    def get_hyperparams(params):
+        Run = namedtuple("Run", params.keys())
+        runs = [Run(*v) for v in product(*params.values())]
+        return runs
 
 def parse_args():
     parser = argparse.ArgumentParser('Model')
     parser.add_argument('--model', type=str, default='pointnet_sem_seg', help='model name [default: pointnet_sem_seg]')
-    parser.add_argument('--batch_size', type=int, default=4, help='Batch Size during training [default: 16]')
-    parser.add_argument('--epoch',  default=100, type=int, help='Epoch to run [default: 128]')
+    parser.add_argument('--batch_size', type=int, default=4, help='Batch Size during training [default: 4]')
+    parser.add_argument('--epoch',  default=100, type=int, help='Epoch to run [default: 100]')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
     parser.add_argument('--gpu', type=str, default='0', help='GPU to use [default: GPU 0]')
     parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]')
     parser.add_argument('--log_dir', type=str, default='pointnet_sem_seg', help='Log path [default: None]')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay [default: 1e-4]')
-    parser.add_argument('--npoint', type=int,  default=1024, help='Point Number [default: 4096]')
+    parser.add_argument('--npoint', type=int,  default=1024, help='Point Number [default: 1024]')
     parser.add_argument('--step_size', type=int,  default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float,  default=0.7, help='Decay rate for lr decay [default: 0.7]')
     parser.add_argument('--test_area', type=int, default=2, help='Which area to use for test, option: 1-6 [default: 5]')
@@ -43,10 +56,11 @@ def parse_args():
 def main(args):
     # obtain class
     if args.mode == "rical":
-        classes = ['ceiling','floor','wall']
+        classes = ['ceiling','floor','wall','other']
+        #classes = ['barrel','ground','fence','tree','pole','clutter']
         root = 'data/rical_indoor3d/'
     elif args.mode == "igvc":
-        classes = ['barrel','car','person']
+        classes = ['barrel','car','person','other']
         root = 'data/igvc_indoor3d/'
     class2label = {cls: i for i,cls in enumerate(classes)}
     seg_classes = class2label
@@ -154,6 +168,13 @@ def main(args):
 
     global_epoch = 0
     best_iou = 0
+    
+    # Initialize a tensorboard class object
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #tb = SummaryWriter()
+    #gt_point, labels = next(iter(trainDataLoader))
+    #tb.add_mesh('ground_truth',vertices=gt_point) #TODO: need to learn how to append mesh
+    #tb.add_graph(args.model.to(device=device), gt_point.to(device=device))
 
     for epoch in range(start_epoch,args.epoch):
         '''Train on chopped scenes'''
@@ -184,6 +205,8 @@ def main(args):
             classifier = classifier.train()
             if args.model == "pointnet_sem_seg":
                 points = points[:,:3,:]
+            if args.model == "pointnet2_sem_seg":
+                points = torch.cat((points[:,:3,:], points[:,6:,:]),1)
             seg_pred, trans_feat = classifier(points)
             seg_pred = seg_pred.contiguous().view(-1, NUM_CLASSES)
             batch_label = target.view(-1, 1)[:, 0].cpu().data.numpy()
@@ -231,6 +254,8 @@ def main(args):
                 classifier = classifier.eval()
                 if args.model == "pointnet_sem_seg":
                     points = points[:,:3,:]
+                if args.model == "pointnet2_sem_seg":
+                    points = torch.cat((points[:,:3,:], points[:,6:,:]),1)
                 seg_pred, trans_feat = classifier(points)
                 pred_val = seg_pred.contiguous().cpu().data.numpy()
                 seg_pred = seg_pred.contiguous().view(-1, NUM_CLASSES)
