@@ -1,0 +1,15 @@
+name: pointnet
+channels:
+  - defaults
+  - pytorch
+dependencies:
+  - pip
+  - python
+  - pytorch
+  - scikit-learn
+  - torchvision
+  - tensorflow
+  - tensorbaord
+  - numpy
+  - tqdm
+  - tensorboard
