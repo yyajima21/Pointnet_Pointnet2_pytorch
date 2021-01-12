@@ -7,12 +7,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 
-DATA_PATH = os.path.join(ROOT_DIR, 'data','s3dis', 'Stanford3dDataset_v1.2')
+DATA_PATH = os.path.join(ROOT_DIR, 'data','s3dis', 'Stanford3dDataset_v1.2_Aligned_Version')
 g_classes = [x.rstrip() for x in open(os.path.join(BASE_DIR, 'meta/class_names.txt'))]
 g_class2label = {cls: i for i,cls in enumerate(g_classes)}
-g_class2color = {'ceiling':	    [0,255,0],
-                 'floor':	    [0,0,255],
-                 'wall':	    [0,255,255],
+g_class2color = {'ceiling':	[0,255,0],
+                 'floor':	[0,0,255],
+                 'wall':	[0,255,255],
                  'beam':        [255,255,0],
                  'column':      [255,0,255],
                  'window':      [100,100,255],
@@ -30,11 +30,8 @@ g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 # -----------------------------------------------------------------------------
 # CONVERT ORIGINAL DATA TO OUR DATA_LABEL FILES
 # -----------------------------------------------------------------------------
-def downsample(cloud, resolution):
-    _, indices = np.unique(np.round(cloud[:,:3],resolution),axis=0,return_index=True)
-    return indices
 
-def collect_point_label(anno_path, out_filename, file_format='txt',downsample=False):
+def collect_point_label(anno_path, out_filename, file_format='txt'):
     """ Convert original dataset files to data_label file (each line is XYZRGBL).
         We aggregated all the points from each instance in the room.
 
@@ -56,10 +53,6 @@ def collect_point_label(anno_path, out_filename, file_format='txt',downsample=Fa
 
         points = np.loadtxt(f)
         labels = np.ones((points.shape[0],1)) * g_class2label[cls]
-        if downsample:
-            indices = downsample(points, 1)
-            points = points[indices]
-            labels = labels[indices]
         points_list.append(np.concatenate([points, labels], 1)) # Nx7
     
     data_label = np.concatenate(points_list, 0)
