@@ -1,0 +1,9 @@
+clutter
+building
+grass
+pond
+road
+dirt
+tree
+vehicle
+sign

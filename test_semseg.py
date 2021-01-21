@@ -19,23 +19,24 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
-classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
-class2label = {cls: i for i,cls in enumerate(classes)}
-seg_classes = class2label
-seg_label_to_cat = {}
-for i,cat in enumerate(seg_classes.keys()):
-    seg_label_to_cat[i] = cat
+#classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
+#class2label = {cls: i for i,cls in enumerate(classes)}
+#seg_classes = class2label
+#seg_label_to_cat = {}
+#for i,cat in enumerate(seg_classes.keys()):
+#    seg_label_to_cat[i] = cat
 
 def parse_args():
     '''PARAMETERS'''
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--batch_size', type=int, default=32, help='batch size in testing [default: 32]')
+    parser.add_argument('--batch_size', type=int, default=25, help='batch size in testing [default: 32]')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--num_point', type=int, default=4096, help='Point Number [default: 4096]')
     parser.add_argument('--log_dir', type=str, default='pointnet2_sem_seg', help='Experiment root')
-    parser.add_argument('--visual', action='store_true', default=False, help='Whether visualize result [default: False]')
-    parser.add_argument('--test_area', type=int, default=5, help='Which area to use for test, option: 1-6 [default: 5]')
-    parser.add_argument('--num_votes', type=int, default=5, help='Aggregate segmentation scores with voting [default: 5]')
+    parser.add_argument('--visual', action='store_true', default=True, help='Whether visualize result [default: False]')
+    parser.add_argument('--test_area', type=int, default=4, help='Which area to use for test, option: 1-6 [default: 5]')
+    parser.add_argument('--num_votes', type=int, default=1, help='Aggregate segmentation scores with voting [default: 5]')
+    parser.add_argument('--data', type=str, default='rical', help='mode [default: s3dis]')
     return parser.parse_args()
 
 def add_vote(vote_label_pool, point_idx, pred_label, weight):
@@ -51,6 +52,20 @@ def main(args):
     def log_string(str):
         logger.info(str)
         print(str)
+    if args.data == "s3dis":
+        classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
+        root = 'data/stanford_indoor3d/'
+    elif args.data == "rical":
+        classes = ['clutter', 'building', 'grass', 'pond', 'road', 'dirt', 'tree', 'vehicle', 'sign']
+        root = 'data/rical_indoor3d/'
+
+    NUM_CLASSES = len(classes)
+    print("NUM_CLASS: {}".format(NUM_CLASSES))
+    class2label = {cls: i for i,cls in enumerate(classes)}
+    seg_classes = class2label
+    seg_label_to_cat = {}
+    for i,cat in enumerate(seg_classes.keys()):
+        seg_label_to_cat[i] = cat
 
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -71,13 +86,11 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    NUM_CLASSES = 13
     BATCH_SIZE = args.batch_size
     NUM_POINT = args.num_point
 
-    root = 'data/stanford_indoor3d/'
 
-    TEST_DATASET_WHOLE_SCENE = ScannetDatasetWholeScene(root, split='test', test_area=args.test_area, block_points=NUM_POINT)
+    TEST_DATASET_WHOLE_SCENE = ScannetDatasetWholeScene(root, split='test', test_area=args.test_area, block_points=NUM_POINT, num_classes=NUM_CLASSES)
     log_string("The number of test data is: %d" %  len(TEST_DATASET_WHOLE_SCENE))
 
     '''MODEL LOADING'''

@@ -23,18 +23,10 @@ ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
 
-classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
-class2label = {cls: i for i,cls in enumerate(classes)}
-seg_classes = class2label
-seg_label_to_cat = {}
-for i,cat in enumerate(seg_classes.keys()):
-    seg_label_to_cat[i] = cat
-
-
 def parse_args():
     parser = argparse.ArgumentParser('Model')
     parser.add_argument('--model', type=str, default='pointnet_sem_seg', help='model name [default: pointnet_sem_seg]')
-    parser.add_argument('--batch_size', type=int, default=25, help='Batch Size during training [default: 16]')
+    parser.add_argument('--batch_size', type=int, default=20, help='Batch Size during training [default: 16]')
     parser.add_argument('--epoch',  default=128, type=int, help='Epoch to run [default: 128]')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
     parser.add_argument('--gpu', type=str, default='0', help='GPU to use [default: GPU 0]')
@@ -46,12 +38,28 @@ def parse_args():
     parser.add_argument('--lr_decay', type=float,  default=0.7, help='Decay rate for lr decay [default: 0.7]')
     parser.add_argument('--test_area', type=int, default=5, help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--data', type=str, default='s3dis', help='mode [default: s3dis]')
+    parser.add_argument('--size', type=str, default='small', help='mode [default: small]')
     return parser.parse_args()
 
 def main(args):
     def log_string(str):
         logger.info(str)
         print(str)
+    
+    if args.data == "s3dis":
+        classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
+        root = 'data/stanford_indoor3d/'
+    elif args.data == "rical":
+        classes = ['clutter', 'building', 'grass', 'pond', 'road', 'dirt', 'tree', 'vehicle', 'sign']
+        root = 'data/rical_indoor3d/'
+
+    NUM_CLASSES = len(classes)
+    print("NUM_CLASS: {}".format(NUM_CLASSES))
+    class2label = {cls: i for i,cls in enumerate(classes)}
+    seg_classes = class2label
+    seg_label_to_cat = {}
+    for i,cat in enumerate(seg_classes.keys()):
+        seg_label_to_cat[i] = cat
 
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -84,15 +92,15 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    root = 'data/stanford_indoor3d/'
-    NUM_CLASSES = 13
+    #root = 'data/stanford_indoor3d/'
+    #NUM_CLASSES = 13
     NUM_POINT = args.npoint
     BATCH_SIZE = args.batch_size
 
     print("start loading training data ...")
-    TRAIN_DATASET = S3DISDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None)
+    TRAIN_DATASET = S3DISDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=args.data, size=args.size)
     print("start loading test data ...")
-    TEST_DATASET = S3DISDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None)
+    TEST_DATASET = S3DISDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=args.data, size=args.size)
     trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True, drop_last=True, worker_init_fn = lambda x: np.random.seed(x+int(time.time())))
     testDataLoader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
     weights = torch.Tensor(TRAIN_DATASET.labelweights).cuda()

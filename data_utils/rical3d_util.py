@@ -7,10 +7,19 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 
-DATA_PATH = os.path.join(ROOT_DIR, 'data','igvc3dDataset')
-g_classes = [x.rstrip() for x in open(os.path.join(BASE_DIR, 'meta/igvc_class_names.txt'))]
+DATA_PATH = os.path.join(ROOT_DIR, 'data','3DRICALDATASET')
+g_classes = [x.rstrip() for x in open(os.path.join(BASE_DIR, 'meta/rical_class_names.txt'))]
 g_class2label = {cls: i for i,cls in enumerate(g_classes)}
-g_class2color = {'barrel': [255,0,0],'car': [0,255,0],'person': [0,0,255]} 
+
+g_class2color = {'clutter':     [0,0,0],
+                 'building':    [128,0,0],
+                 'grass':       [0,128,0],
+                 'pond':        [0,0,128],
+                 'road':        [128,64,128],
+                 'dirt':        [60,40,222],
+                 'tree':        [128,128,0],
+                 'vehicle':     [64,0,128],
+                 'sign':        [192,128,128]} 
 g_easy_view_labels = [7,8,9,10,11,1]
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
@@ -18,8 +27,11 @@ g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 # -----------------------------------------------------------------------------
 # CONVERT ORIGINAL DATA TO OUR DATA_LABEL FILES
 # -----------------------------------------------------------------------------
+def downsample_cloud(cloud, resolution):
+    _, indices = np.unique(np.round(cloud[:,:3],resolution),axis=0,return_index=True)
+    return indices
 
-def collect_point_label(anno_path, out_filename, file_format='txt'):
+def collect_point_label(anno_path, out_filename, file_format='txt',downsample=False):
     """ Convert original dataset files to data_label file (each line is XYZRGBL).
         We aggregated all the points from each instance in the room.
 
@@ -41,6 +53,10 @@ def collect_point_label(anno_path, out_filename, file_format='txt'):
 
         points = np.loadtxt(f)
         labels = np.ones((points.shape[0],1)) * g_class2label[cls]
+        if downsample:
+            indices = downsample_cloud(points, 1)
+            points = points[indices]
+            labels = labels[indices]
         points_list.append(np.concatenate([points, labels], 1)) # Nx7
     
     data_label = np.concatenate(points_list, 0)

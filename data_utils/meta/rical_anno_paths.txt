@@ -1,0 +1,4 @@
+Area_1/Ground-Truth-Test_1-10-26-2020-RICAL-point-cloud/Annotations
+Area_2/Ground-Truth-Test_2-10-26-2020-RICAL-point-cloud/Annotations
+Area_3/Ground-Truth-Test_3-10-26-2020-RICAL-point-cloud/Annotations
+Area_4/Ground-Truth-Test_4-10-26-2020-RICAL-point-cloud/Annotations

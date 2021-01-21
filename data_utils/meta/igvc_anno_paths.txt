@@ -1,5 +1,0 @@
-Area_1/save_annotation_data_1/Annotations
-Area_1/save_annotation_data_270/Annotations
-Area_1/save_annotation_data_280/Annotations
-Area_1/save_annotation_data_290/Annotations
-Area_1/save_annotation_data_300/Annotations

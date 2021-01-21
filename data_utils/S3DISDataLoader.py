@@ -4,8 +4,9 @@ from torch.utils.data import Dataset
 
 
 class S3DISDataset(Dataset):
-    def __init__(self, split='train', data_root='trainval_fullarea', num_point=4096, test_area=5, block_size=1.0, sample_rate=1.0, transform=None):
+    def __init__(self, split='train', data_root='trainval_fullarea', num_point=4096, test_area=5, block_size=1.0, sample_rate=1.0, transform=None, num_classes=None, datatype="s3dis", size="small"):
         super().__init__()
+        self.datatype = datatype
         self.num_point = num_point
         self.block_size = block_size
         self.transform = transform
@@ -18,13 +19,17 @@ class S3DISDataset(Dataset):
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
         num_point_all = []
-        labelweights = np.zeros(13)
-        rooms_split = rooms_split[:10]
+        labelweights = np.zeros(num_classes)
+        # add an option to reduce datasize
+        if size == "small":
+            rooms_split = rooms_split[:10]
+        else:
+            rooms_split = rooms_split
         for room_name in rooms_split:
             room_path = os.path.join(data_root, room_name)
             room_data = np.load(room_path)  # xyzrgbl, N*7
             points, labels = room_data[:, 0:6], room_data[:, 6]  # xyzrgb, N*6; l, N
-            tmp, _ = np.histogram(labels, range(14))
+            tmp, _ = np.histogram(labels, range(num_classes+1))
             labelweights += tmp
             coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
             self.room_points.append(points), self.room_labels.append(labels)
@@ -38,8 +43,13 @@ class S3DISDataset(Dataset):
         num_iter = int(np.sum(num_point_all) * sample_rate / num_point)
         room_idxs = []
         for index in range(len(rooms_split)):
+            # removed for debugging purpose
+            if size == "small":
+                room_idxs.extend([index] * 10)
+            else:
+                room_idxs.extend([index] * int(round(sample_prob[index] * num_iter)))
             #room_idxs.extend([index] * int(round(sample_prob[index] * num_iter)))
-            room_idxs.extend([index] * 10)
+            #room_idxs.extend([index] * 10)
         self.room_idxs = np.array(room_idxs)
         print("Totally {} samples in {} set.".format(len(self.room_idxs), split))
 
@@ -48,13 +58,18 @@ class S3DISDataset(Dataset):
         points = self.room_points[room_idx]   # N * 6
         labels = self.room_labels[room_idx]   # N
         N_points = points.shape[0]
+        if self.datatype == "s3dis":
+            limit = 1024
+        elif self.datatype == "rical":
+            limit = 128
 
         while (True):
             center = points[np.random.choice(N_points)][:3]
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
             block_max = center + [self.block_size / 2.0, self.block_size / 2.0, 0]
             point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1] >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
-            if point_idxs.size > 1024:
+            #if point_idxs.size > 1024:
+            if point_idxs.size > limit:
                 break
 
         if point_idxs.size >= self.num_point:
@@ -82,7 +97,7 @@ class S3DISDataset(Dataset):
 
 class ScannetDatasetWholeScene():
     # prepare to give prediction on each points
-    def __init__(self, root, block_points=4096, split='test', test_area=5, stride=0.5, block_size=1.0, padding=0.001):
+    def __init__(self, root, block_points=4096, split='test', test_area=5, stride=0.5, block_size=1.0, padding=0.001, num_classes=10):
         self.block_points = block_points
         self.block_size = block_size
         self.padding = padding
@@ -107,9 +122,9 @@ class ScannetDatasetWholeScene():
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
 
-        labelweights = np.zeros(13)
+        labelweights = np.zeros(num_classes)
         for seg in self.semantic_labels_list:
-            tmp, _ = np.histogram(seg, range(14))
+            tmp, _ = np.histogram(seg, range(num_classes+1))
             self.scene_points_num.append(seg.shape[0])
             labelweights += tmp
         labelweights = labelweights.astype(np.float32)
