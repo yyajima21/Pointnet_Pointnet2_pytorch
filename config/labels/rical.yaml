@@ -1,0 +1,13 @@
+# data parameters
+name: 'rical' # data folder
+root: 'data/stanford_indoor3d/'
+labels: 
+  0: 'clutter'
+  1: 'building'
+  2: 'grass'
+  3: 'pond'
+  4: 'road'
+  5: 'dirt'
+  6: 'tree'
+  7: 'vehicle'
+  8: 'sign'

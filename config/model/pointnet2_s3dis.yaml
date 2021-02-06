@@ -1,6 +1,6 @@
 # training parameters
 train:
-  model: pointnet_sem_seg_light # model name
+  model: pointnet2_sem_seg # model name
   batch_size: 20 # batch size during training
   epochs: 128 # epoch to run
   lr: 0.001 # initial learning rate

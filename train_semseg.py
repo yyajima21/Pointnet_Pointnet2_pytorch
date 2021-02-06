@@ -27,25 +27,27 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 def parse_args():
     parser = argparse.ArgumentParser('Model')
     parser.add_argument('--gpu', type=str, default='0', help='GPU to use [default: GPU 0]')
-    parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]')
     parser.add_argument('--log_dir', type=str, default=None, help='Log path [default: None]')
-    parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay [default: 1e-4]')
-    parser.add_argument('--npoint', type=int,  default=4096, help='Point Number [default: 4096]')
-    parser.add_argument('--step_size', type=int,  default=10, help='Decay step for lr decay [default: every 10 epochs]')
-    parser.add_argument('--lr_decay', type=float,  default=0.7, help='Decay rate for lr decay [default: 0.7]')
-    parser.add_argument('--test_area', type=int, default=5, help='Which area to use for test, option: 1-6 [default: 5]')
-    parser.add_argument('--config', type=str, default='config/pointnet_light_rical.yaml', help='config file')
+    parser.add_argument('--config', type=str, default='config/model/pointnet_light_rical.yaml', help='config file')
     return parser.parse_args()
 
-def setting(ARCH):
+def yaml_setting(ARCH):
     if ARCH['data']['name'] == "s3dis":
-        classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
+        data_yaml = os.path.join(BASE_DIR, 'config/labels/s3dis.yaml')
+        data = yaml.safe_load(open(data_yaml, "r"))
+        classes = [i for i in data['labels'].values()]
         root = 'data/stanford_indoor3d/'
     elif ARCH['data']['name'] == "rical":
-        classes = ['clutter', 'building', 'grass', 'pond', 'road', 'dirt', 'tree', 'vehicle', 'sign']
+        data_yaml = os.path.join(BASE_DIR, 'config/labels/rical.yaml')
+        data = yaml.safe_load(open(data_yaml, "r"))
+        classes = [i for i in data['labels'].values()]
+        #classes = ['clutter', 'building', 'grass', 'pond', 'road', 'dirt', 'tree', 'vehicle', 'sign']
         root = 'data/rical_indoor3d/'
     elif ARCH['data']['name'] == "vkitti":
-        classes = ['terrain', 'tree', 'vegetation', 'building', 'road', 'guardrail', 'trafficsign', 'trafficlight', 'pole', 'misc','truck','car','van','clutter']
+        data_yaml = os.path.join(BASE_DIR, 'config/labels/vkitti.yaml')
+        data = yaml.safe_load(open(data_yaml, "r"))
+        classes = [i for i in data['labels'].values()]
+        #classes = ['terrain', 'tree', 'vegetation', 'building', 'road', 'guardrail', 'trafficsign', 'trafficlight', 'pole', 'misc','truck','car','van','clutter']
         root = 'data/vkitti_indoor3d/'
     return classes, root
 
@@ -57,7 +59,7 @@ def main(args):
     yaml_path = os.path.join(BASE_DIR, args.config)
     ARCH = yaml.safe_load(open(yaml_path, "r"))
 
-    classes, root = setting(ARCH)
+    classes, root = yaml_setting(ARCH)
     NUM_CLASSES = len(classes)
     print("NUM_CLASS: {}".format(NUM_CLASSES))
     class2label = {cls: i for i,cls in enumerate(classes)}
@@ -97,13 +99,13 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    NUM_POINT = args.npoint
+    NUM_POINT = ARCH['train']['npoint']
     BATCH_SIZE = ARCH['train']['batch_size']
 
     print("start loading training data ...")
-    TRAIN_DATASET = S3DISDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=ARCH['data']['name'], debug_mode=ARCH['data']['debug_mode'])
+    TRAIN_DATASET = S3DISDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=ARCH['test']['area'], block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=ARCH['data']['name'], debug_mode=ARCH['data']['debug_mode'])
     print("start loading test data ...")
-    TEST_DATASET = S3DISDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=ARCH['data']['name'], debug_mode=ARCH['data']['debug_mode'])
+    TEST_DATASET = S3DISDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=ARCH['test']['area'], block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=ARCH['data']['name'], debug_mode=ARCH['data']['debug_mode'])
     trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True, drop_last=True, worker_init_fn = lambda x: np.random.seed(x+int(time.time())))
     testDataLoader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
     weights = torch.Tensor(TRAIN_DATASET.labelweights).cuda()
@@ -138,13 +140,13 @@ def main(args):
         start_epoch = 0
         classifier = classifier.apply(weights_init)
 
-    if args.optimizer == 'Adam':
+    if ARCH['train']['optimizer'] == 'Adam':
         optimizer = torch.optim.Adam(
             classifier.parameters(),
             lr=ARCH['train']['lr'],
             betas=(0.9, 0.999),
             eps=1e-08,
-            weight_decay=args.decay_rate
+            weight_decay=ARCH['train']['weight_decay']
         )
     else:
         optimizer = torch.optim.SGD(classifier.parameters(), lr=ARCH['train']['lr'], momentum=0.9)
@@ -156,7 +158,7 @@ def main(args):
     LEARNING_RATE_CLIP = 1e-5
     MOMENTUM_ORIGINAL = 0.1
     MOMENTUM_DECCAY = 0.5
-    MOMENTUM_DECCAY_STEP = args.step_size
+    MOMENTUM_DECCAY_STEP = ARCH['train']['step_size']
 
     global_epoch = 0
     best_iou = 0
@@ -169,7 +171,7 @@ def main(args):
     for epoch in range(start_epoch,ARCH['train']['epochs']):
         '''Train on chopped scenes'''
         log_string('**** Epoch %d (%d/%s) ****' % (global_epoch + 1, epoch + 1, ARCH['train']['epochs']))
-        lr = max(ARCH['train']['lr'] * (args.lr_decay ** (epoch // args.step_size)), LEARNING_RATE_CLIP)
+        lr = max(ARCH['train']['lr'] * (ARCH['train']['lr_decay'] ** (epoch // ARCH['train']['step_size'])), LEARNING_RATE_CLIP)
         log_string('Learning rate:%f' % lr)
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
