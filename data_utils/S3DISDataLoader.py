@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 
 
 class S3DISDataset(Dataset):
-    def __init__(self, split='train', data_root='trainval_fullarea', num_point=4096, test_area=5, block_size=1.0, sample_rate=1.0, transform=None, num_classes=None, datatype="s3dis", size="small"):
+    def __init__(self, split='train', data_root='trainval_fullarea', num_point=4096, test_area=5, block_size=1.0, sample_rate=1.0, transform=None, num_classes=None, datatype="s3dis", debug_mode=False):
         super().__init__()
         self.datatype = datatype
         self.num_point = num_point
@@ -21,13 +21,16 @@ class S3DISDataset(Dataset):
         num_point_all = []
         labelweights = np.zeros(num_classes)
         # add an option to reduce datasize
-        if size == "small":
+        if debug_mode:
             rooms_split = rooms_split[:10]
         else:
             rooms_split = rooms_split
         for room_name in rooms_split:
             room_path = os.path.join(data_root, room_name)
-            room_data = np.load(room_path)  # xyzrgbl, N*7
+            if datatype == "vkitti":
+                room_data = np.loadtxt(room_path)
+            else:
+                room_data = np.load(room_path)  # xyzrgbl, N*7
             points, labels = room_data[:, 0:6], room_data[:, 6]  # xyzrgb, N*6; l, N
             tmp, _ = np.histogram(labels, range(num_classes+1))
             labelweights += tmp
@@ -44,7 +47,7 @@ class S3DISDataset(Dataset):
         room_idxs = []
         for index in range(len(rooms_split)):
             # removed for debugging purpose
-            if size == "small":
+            if debug_mode:
                 room_idxs.extend([index] * 10)
             else:
                 room_idxs.extend([index] * int(round(sample_prob[index] * num_iter)))
@@ -62,7 +65,8 @@ class S3DISDataset(Dataset):
             limit = 1024
         elif self.datatype == "rical":
             limit = 128
-
+        else:
+            limit = 128
         while (True):
             center = points[np.random.choice(N_points)][:3]
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
@@ -97,7 +101,7 @@ class S3DISDataset(Dataset):
 
 class ScannetDatasetWholeScene():
     # prepare to give prediction on each points
-    def __init__(self, root, block_points=4096, split='test', test_area=5, stride=0.5, block_size=1.0, padding=0.001, num_classes=10):
+    def __init__(self, root, block_points=4096, split='test', test_area=5, stride=0.5, block_size=1.0, padding=0.001, num_classes=10, debug_mode=False):
         self.block_points = block_points
         self.block_size = block_size
         self.padding = padding
@@ -114,7 +118,11 @@ class ScannetDatasetWholeScene():
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
         for file in self.file_list:
-            data = np.load(root + file)
+            if datatype == "vkitti":
+                data = np.loadtxt(root + file)
+            else:
+                data = np.load(root + file)
+            #data = np.load(root + file)
             points = data[:, :3]
             self.scene_points_list.append(data[:, :6])
             self.semantic_labels_list.append(data[:, 6])
@@ -140,6 +148,7 @@ class ScannetDatasetWholeScene():
         grid_y = int(np.ceil(float(coord_max[1] - coord_min[1] - self.block_size) / self.stride) + 1)
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]),  np.array([])
         for index_y in range(0, grid_y):
+            # TODO: issues here the code is stack on this part
             for index_x in range(0, grid_x):
                 s_x = coord_min[0] + index_x * self.stride
                 e_x = min(s_x + self.block_size, coord_max[0])

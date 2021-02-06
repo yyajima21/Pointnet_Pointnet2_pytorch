@@ -16,6 +16,7 @@ from tqdm import tqdm
 import provider
 import numpy as np
 import time
+import yaml
 from torch.utils.tensorboard import SummaryWriter
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,10 +26,6 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
 def parse_args():
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--model', type=str, default='pointnet_sem_seg', help='model name [default: pointnet_sem_seg]')
-    parser.add_argument('--batch_size', type=int, default=20, help='Batch Size during training [default: 16]')
-    parser.add_argument('--epoch',  default=128, type=int, help='Epoch to run [default: 128]')
-    parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
     parser.add_argument('--gpu', type=str, default='0', help='GPU to use [default: GPU 0]')
     parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]')
     parser.add_argument('--log_dir', type=str, default=None, help='Log path [default: None]')
@@ -37,22 +34,30 @@ def parse_args():
     parser.add_argument('--step_size', type=int,  default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float,  default=0.7, help='Decay rate for lr decay [default: 0.7]')
     parser.add_argument('--test_area', type=int, default=5, help='Which area to use for test, option: 1-6 [default: 5]')
-    parser.add_argument('--data', type=str, default='s3dis', help='mode [default: s3dis]')
-    parser.add_argument('--size', type=str, default='small', help='mode [default: small]')
+    parser.add_argument('--config', type=str, default='config/pointnet_light_rical.yaml', help='config file')
     return parser.parse_args()
+
+def setting(ARCH):
+    if ARCH['data']['name'] == "s3dis":
+        classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
+        root = 'data/stanford_indoor3d/'
+    elif ARCH['data']['name'] == "rical":
+        classes = ['clutter', 'building', 'grass', 'pond', 'road', 'dirt', 'tree', 'vehicle', 'sign']
+        root = 'data/rical_indoor3d/'
+    elif ARCH['data']['name'] == "vkitti":
+        classes = ['terrain', 'tree', 'vegetation', 'building', 'road', 'guardrail', 'trafficsign', 'trafficlight', 'pole', 'misc','truck','car','van','clutter']
+        root = 'data/vkitti_indoor3d/'
+    return classes, root
 
 def main(args):
     def log_string(str):
         logger.info(str)
         print(str)
-    
-    if args.data == "s3dis":
-        classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
-        root = 'data/stanford_indoor3d/'
-    elif args.data == "rical":
-        classes = ['clutter', 'building', 'grass', 'pond', 'road', 'dirt', 'tree', 'vehicle', 'sign']
-        root = 'data/rical_indoor3d/'
 
+    yaml_path = os.path.join(BASE_DIR, args.config)
+    ARCH = yaml.safe_load(open(yaml_path, "r"))
+
+    classes, root = setting(ARCH)
     NUM_CLASSES = len(classes)
     print("NUM_CLASS: {}".format(NUM_CLASSES))
     class2label = {cls: i for i,cls in enumerate(classes)}
@@ -85,22 +90,20 @@ def main(args):
     logger = logging.getLogger("Model")
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler('%s/%s.txt' % (log_dir, args.model))
+    file_handler = logging.FileHandler('%s/%s.txt' % (log_dir, ARCH['train']['model']))
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     log_string('PARAMETER ...')
     log_string(args)
 
-    #root = 'data/stanford_indoor3d/'
-    #NUM_CLASSES = 13
     NUM_POINT = args.npoint
-    BATCH_SIZE = args.batch_size
+    BATCH_SIZE = ARCH['train']['batch_size']
 
     print("start loading training data ...")
-    TRAIN_DATASET = S3DISDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=args.data, size=args.size)
+    TRAIN_DATASET = S3DISDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=ARCH['data']['name'], debug_mode=ARCH['data']['debug_mode'])
     print("start loading test data ...")
-    TEST_DATASET = S3DISDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=args.data, size=args.size)
+    TEST_DATASET = S3DISDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1.0, transform=None, num_classes=NUM_CLASSES, datatype=ARCH['data']['name'], debug_mode=ARCH['data']['debug_mode'])
     trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True, drop_last=True, worker_init_fn = lambda x: np.random.seed(x+int(time.time())))
     testDataLoader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
     weights = torch.Tensor(TRAIN_DATASET.labelweights).cuda()
@@ -109,8 +112,8 @@ def main(args):
     log_string("The number of test data is: %d" % len(TEST_DATASET))
 
     '''MODEL LOADING'''
-    MODEL = importlib.import_module(args.model)
-    shutil.copy('models/%s.py' % args.model, str(experiment_dir))
+    MODEL = importlib.import_module(ARCH['train']['model'])
+    shutil.copy('models/%s.py' % ARCH['train']['model'], str(experiment_dir))
     shutil.copy('models/pointnet_util.py', str(experiment_dir))
 
     classifier = MODEL.get_model(NUM_CLASSES).cuda()
@@ -138,13 +141,13 @@ def main(args):
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(
             classifier.parameters(),
-            lr=args.learning_rate,
+            lr=ARCH['train']['lr'],
             betas=(0.9, 0.999),
             eps=1e-08,
             weight_decay=args.decay_rate
         )
     else:
-        optimizer = torch.optim.SGD(classifier.parameters(), lr=args.learning_rate, momentum=0.9)
+        optimizer = torch.optim.SGD(classifier.parameters(), lr=ARCH['train']['lr'], momentum=0.9)
 
     def bn_momentum_adjust(m, momentum):
         if isinstance(m, torch.nn.BatchNorm2d) or isinstance(m, torch.nn.BatchNorm1d):
@@ -160,13 +163,13 @@ def main(args):
 
     # Initialize a tensorboard class object
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    tb = SummaryWriter(comment=f"DATA_{args.data}_LR_{args.learning_rate}_BS_{args.batch_size}")
-    print("mode: {} device: {} lr: {} batch size: {}".format(args.data,device,args.learning_rate,args.batch_size))
+    tb = SummaryWriter(comment=f"DATA_{ARCH['data']['name']}_LR_{ARCH['train']['lr']}_BS_{BATCH_SIZE}")
+    print("mode: {} device: {} lr: {} batch size: {}".format(ARCH['data']['name'],device,ARCH['train']['lr'],BATCH_SIZE))
     
-    for epoch in range(start_epoch,args.epoch):
+    for epoch in range(start_epoch,ARCH['train']['epochs']):
         '''Train on chopped scenes'''
-        log_string('**** Epoch %d (%d/%s) ****' % (global_epoch + 1, epoch + 1, args.epoch))
-        lr = max(args.learning_rate * (args.lr_decay ** (epoch // args.step_size)), LEARNING_RATE_CLIP)
+        log_string('**** Epoch %d (%d/%s) ****' % (global_epoch + 1, epoch + 1, ARCH['train']['epochs']))
+        lr = max(ARCH['train']['lr'] * (args.lr_decay ** (epoch // args.step_size)), LEARNING_RATE_CLIP)
         log_string('Learning rate:%f' % lr)
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr

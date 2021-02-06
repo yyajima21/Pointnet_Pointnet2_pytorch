@@ -32,11 +32,11 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=25, help='batch size in testing [default: 32]')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--num_point', type=int, default=4096, help='Point Number [default: 4096]')
-    parser.add_argument('--log_dir', type=str, default='pointnet2_sem_seg', help='Experiment root')
+    parser.add_argument('--log_dir', type=str, default='pointnet_sem_seg_light', help='Experiment root')
     parser.add_argument('--visual', action='store_true', default=True, help='Whether visualize result [default: False]')
     parser.add_argument('--test_area', type=int, default=4, help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=1, help='Aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--data', type=str, default='rical', help='mode [default: s3dis]')
+    parser.add_argument('--data', type=str, default='vkitti', help='mode [default: s3dis]')
     return parser.parse_args()
 
 def add_vote(vote_label_pool, point_idx, pred_label, weight):
@@ -58,6 +58,10 @@ def main(args):
     elif args.data == "rical":
         classes = ['clutter', 'building', 'grass', 'pond', 'road', 'dirt', 'tree', 'vehicle', 'sign']
         root = 'data/rical_indoor3d/'
+
+    elif args.data == "vkitti":
+        classes = ['terrain', 'tree', 'vegetation', 'building', 'road', 'guardrail', 'trafficsign', 'trafficlight', 'pole', 'misc','truck','car','van','clutter']
+        root = 'data/vkitti_indoor3d/'
 
     NUM_CLASSES = len(classes)
     print("NUM_CLASS: {}".format(NUM_CLASSES))
@@ -90,7 +94,7 @@ def main(args):
     NUM_POINT = args.num_point
 
 
-    TEST_DATASET_WHOLE_SCENE = ScannetDatasetWholeScene(root, split='test', test_area=args.test_area, block_points=NUM_POINT, num_classes=NUM_CLASSES)
+    TEST_DATASET_WHOLE_SCENE = ScannetDatasetWholeScene(root, split='test', test_area=args.test_area, block_points=NUM_POINT, num_classes=NUM_CLASSES, datatype=args.data)
     log_string("The number of test data is: %d" %  len(TEST_DATASET_WHOLE_SCENE))
 
     '''MODEL LOADING'''
