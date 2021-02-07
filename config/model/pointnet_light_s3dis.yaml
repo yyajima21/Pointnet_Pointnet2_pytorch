@@ -9,6 +9,9 @@ train:
   weight_decay: 0.0001 # weight decay
   optimizer: 'Adam' # Adam or SGD
   npoint: 4096 # point Number
+  lr_clip: 0.00001
+  momentum_orig: 0.1
+  momentum_decay: 0.5
 
 # testing parameters
 test:

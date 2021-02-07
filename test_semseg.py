@@ -14,29 +14,24 @@ import importlib
 from tqdm import tqdm
 import provider
 import numpy as np
+import yaml
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
-#classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
-#class2label = {cls: i for i,cls in enumerate(classes)}
-#seg_classes = class2label
-#seg_label_to_cat = {}
-#for i,cat in enumerate(seg_classes.keys()):
-#    seg_label_to_cat[i] = cat
-
 def parse_args():
     '''PARAMETERS'''
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--batch_size', type=int, default=25, help='batch size in testing [default: 32]')
+    #parser.add_argument('--batch_size', type=int, default=25, help='batch size in testing [default: 32]')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
-    parser.add_argument('--num_point', type=int, default=4096, help='Point Number [default: 4096]')
-    parser.add_argument('--log_dir', type=str, default='pointnet_sem_seg_light', help='Experiment root')
-    parser.add_argument('--visual', action='store_true', default=True, help='Whether visualize result [default: False]')
-    parser.add_argument('--test_area', type=int, default=4, help='Which area to use for test, option: 1-6 [default: 5]')
-    parser.add_argument('--num_votes', type=int, default=1, help='Aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--data', type=str, default='vkitti', help='mode [default: s3dis]')
+    #parser.add_argument('--num_point', type=int, default=4096, help='Point Number [default: 4096]')
+    #parser.add_argument('--log_dir', type=str, default='pointnet_sem_seg_light', help='Experiment root')
+    #parser.add_argument('--visual', action='store_true', default=True, help='Whether visualize result [default: False]')
+    #parser.add_argument('--test_area', type=int, default=4, help='Which area to use for test, option: 1-6 [default: 5]')
+    #parser.add_argument('--num_votes', type=int, default=1, help='Aggregate segmentation scores with voting [default: 5]')
+    #parser.add_argument('--data', type=str, default='vkitti', help='mode [default: s3dis]')
+    parser.add_argument('--config', type=str, default='config/model/pointnet_light_s3dis.yaml', help='config file')
     return parser.parse_args()
 
 def add_vote(vote_label_pool, point_idx, pred_label, weight):
@@ -48,21 +43,32 @@ def add_vote(vote_label_pool, point_idx, pred_label, weight):
                 vote_label_pool[int(point_idx[b, n]), int(pred_label[b, n])] += 1
     return vote_label_pool
 
+def yaml_setting(ARCH):
+    if ARCH['data']['name'] == "s3dis":
+        data_yaml = os.path.join(BASE_DIR, 'config/labels/s3dis.yaml')
+        data = yaml.safe_load(open(data_yaml, "r"))
+        classes = [i for i in data['labels'].values()]
+        root = 'data/stanford_indoor3d/'
+    elif ARCH['data']['name'] == "rical":
+        data_yaml = os.path.join(BASE_DIR, 'config/labels/rical.yaml')
+        data = yaml.safe_load(open(data_yaml, "r"))
+        classes = [i for i in data['labels'].values()]
+        root = 'data/rical_indoor3d/'
+    elif ARCH['data']['name'] == "vkitti":
+        data_yaml = os.path.join(BASE_DIR, 'config/labels/vkitti.yaml')
+        data = yaml.safe_load(open(data_yaml, "r"))
+        classes = [i for i in data['labels'].values()]
+        root = 'data/vkitti_indoor3d/'
+    return classes, root
+
 def main(args):
     def log_string(str):
         logger.info(str)
         print(str)
-    if args.data == "s3dis":
-        classes = ['ceiling','floor','wall','beam','column','window','door','table','chair','sofa','bookcase','board','clutter']
-        root = 'data/stanford_indoor3d/'
-    elif args.data == "rical":
-        classes = ['clutter', 'building', 'grass', 'pond', 'road', 'dirt', 'tree', 'vehicle', 'sign']
-        root = 'data/rical_indoor3d/'
-
-    elif args.data == "vkitti":
-        classes = ['terrain', 'tree', 'vegetation', 'building', 'road', 'guardrail', 'trafficsign', 'trafficlight', 'pole', 'misc','truck','car','van','clutter']
-        root = 'data/vkitti_indoor3d/'
-
+    yaml_path = os.path.join(BASE_DIR, args.config)
+    ARCH = yaml.safe_load(open(yaml_path, "r"))
+    classes, root = yaml_setting(ARCH)
+    
     NUM_CLASSES = len(classes)
     print("NUM_CLASS: {}".format(NUM_CLASSES))
     class2label = {cls: i for i,cls in enumerate(classes)}
@@ -73,7 +79,7 @@ def main(args):
 
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    experiment_dir = 'log/sem_seg/' + args.log_dir
+    experiment_dir = 'log/sem_seg/' + ARCH['test']['logdir']
     visual_dir = experiment_dir + '/visual/'
     visual_dir = Path(visual_dir)
     visual_dir.mkdir(exist_ok=True)
@@ -90,11 +96,11 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    BATCH_SIZE = args.batch_size
-    NUM_POINT = args.num_point
+    BATCH_SIZE = ARCH['test']['batch_size']
+    NUM_POINT = ARCH['test']['npoint']
 
 
-    TEST_DATASET_WHOLE_SCENE = ScannetDatasetWholeScene(root, split='test', test_area=args.test_area, block_points=NUM_POINT, num_classes=NUM_CLASSES, datatype=args.data)
+    TEST_DATASET_WHOLE_SCENE = ScannetDatasetWholeScene(root, split='test', test_area=ARCH['test']['area'], block_points=NUM_POINT, num_classes=NUM_CLASSES, datatype=ARCH['data']['name'])
     log_string("The number of test data is: %d" %  len(TEST_DATASET_WHOLE_SCENE))
 
     '''MODEL LOADING'''
@@ -120,14 +126,14 @@ def main(args):
             total_seen_class_tmp = [0 for _ in range(NUM_CLASSES)]
             total_correct_class_tmp = [0 for _ in range(NUM_CLASSES)]
             total_iou_deno_class_tmp = [0 for _ in range(NUM_CLASSES)]
-            if args.visual:
+            if ARCH['test']['visual']:
                 fout = open(os.path.join(visual_dir, scene_id[batch_idx] + '_pred.obj'), 'w')
                 fout_gt = open(os.path.join(visual_dir, scene_id[batch_idx] + '_gt.obj'), 'w')
 
             whole_scene_data = TEST_DATASET_WHOLE_SCENE.scene_points_list[batch_idx]
             whole_scene_label = TEST_DATASET_WHOLE_SCENE.semantic_labels_list[batch_idx]
             vote_label_pool = np.zeros((whole_scene_label.shape[0], NUM_CLASSES))
-            for _ in tqdm(range(args.num_votes), total=args.num_votes):
+            for _ in tqdm(range(ARCH['test']['num_votes']), total=ARCH['test']['num_votes']):
                 scene_data, scene_label, scene_smpw, scene_point_index = TEST_DATASET_WHOLE_SCENE[batch_idx]
                 num_blocks = scene_data.shape[0]
                 s_batch_num = (num_blocks + BATCH_SIZE - 1) // BATCH_SIZE
@@ -181,7 +187,7 @@ def main(args):
             for i in range(whole_scene_label.shape[0]):
                 color = g_label2color[pred_label[i]]
                 color_gt = g_label2color[whole_scene_label[i]]
-                if args.visual:
+                if ARCH['test']['visual']:
                     fout.write('v %f %f %f %d %d %d\n' % (
                     whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], color[0], color[1],
                     color[2]))
@@ -189,7 +195,7 @@ def main(args):
                         'v %f %f %f %d %d %d\n' % (
                         whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], color_gt[0],
                         color_gt[1], color_gt[2]))
-            if args.visual:
+            if ARCH['test']['visual']:
                 fout.close()
                 fout_gt.close()
 

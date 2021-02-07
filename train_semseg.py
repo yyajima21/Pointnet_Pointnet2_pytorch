@@ -1,6 +1,8 @@
 """
-Author: Benny
+Original Author: Benny
 Date: Nov 2019
+Maintainer: Yosuke Yajima
+Date: Feb 2021
 """
 import argparse
 import os
@@ -27,8 +29,8 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 def parse_args():
     parser = argparse.ArgumentParser('Model')
     parser.add_argument('--gpu', type=str, default='0', help='GPU to use [default: GPU 0]')
-    parser.add_argument('--log_dir', type=str, default=None, help='Log path [default: None]')
-    parser.add_argument('--config', type=str, default='config/model/pointnet_light_rical.yaml', help='config file')
+    #parser.add_argument('--log_dir', type=str, default=None, help='Log path [default: None]')
+    parser.add_argument('--config', type=str, default='config/model/pointnet_light_s3dis.yaml', help='config file')
     return parser.parse_args()
 
 def yaml_setting(ARCH):
@@ -77,10 +79,10 @@ def main(args):
     experiment_dir.mkdir(exist_ok=True)
     experiment_dir = experiment_dir.joinpath('sem_seg')
     experiment_dir.mkdir(exist_ok=True)
-    if args.log_dir is None:
+    if ARCH['train']['logdir'] is None:
         experiment_dir = experiment_dir.joinpath(timestr)
     else:
-        experiment_dir = experiment_dir.joinpath(args.log_dir)
+        experiment_dir = experiment_dir.joinpath(ARCH['train']['logdir'])
     experiment_dir.mkdir(exist_ok=True)
     checkpoints_dir = experiment_dir.joinpath('checkpoints/')
     checkpoints_dir.mkdir(exist_ok=True)
@@ -155,9 +157,9 @@ def main(args):
         if isinstance(m, torch.nn.BatchNorm2d) or isinstance(m, torch.nn.BatchNorm1d):
             m.momentum = momentum
 
-    LEARNING_RATE_CLIP = 1e-5
-    MOMENTUM_ORIGINAL = 0.1
-    MOMENTUM_DECCAY = 0.5
+    LEARNING_RATE_CLIP = ARCH['train']['lr_clip']
+    MOMENTUM_ORIGINAL = ARCH['train']['momentum_orig']
+    MOMENTUM_DECCAY = ARCH['train']['momentum_decay']
     MOMENTUM_DECCAY_STEP = ARCH['train']['step_size']
 
     global_epoch = 0

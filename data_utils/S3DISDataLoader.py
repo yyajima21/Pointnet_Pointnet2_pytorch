@@ -101,7 +101,7 @@ class S3DISDataset(Dataset):
 
 class ScannetDatasetWholeScene():
     # prepare to give prediction on each points
-    def __init__(self, root, block_points=4096, split='test', test_area=5, stride=0.5, block_size=1.0, padding=0.001, num_classes=10, debug_mode=False):
+    def __init__(self, root, block_points=4096, split='test', test_area=5, stride=0.5, block_size=1.0, padding=0.001, num_classes=10, debug_mode=False, datatype='s3dis'):
         self.block_points = block_points
         self.block_size = block_size
         self.padding = padding
