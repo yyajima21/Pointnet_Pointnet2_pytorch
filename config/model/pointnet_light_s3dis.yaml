@@ -4,21 +4,24 @@ train:
   batch_size: 20 # batch size during training
   epochs: 128 # epoch to run
   lr: 0.001 # initial learning rate
-  lr_decay: 0.7 # decay rate for lr decay
-  step_size: 10 # decay step for lr decay
-  weight_decay: 0.0001 # weight decay
+  lr_decay: 0.7 # decay rate for lr decay [default: 0.7]
+  step_size: 10 # decay step for lr decay [default: 10]
+  weight_decay: 0.0001 # weight decay [default: 0.0001]
   optimizer: 'Adam' # Adam or SGD
-  npoint: 4096 # point Number
-  lr_clip: 0.00001
-  momentum_orig: 0.1
-  momentum_decay: 0.5
+  npoint: 4096 # point Number [default: 4096]
+  lr_clip: 0.00001 # [default: 0.00001]
+  momentum_orig: 0.1 # [default: 0.1]
+  momentum_decay: 0.5 # [default: 0.5]
+  logdir: 'pointnet_light_s3dis'
 
 # testing parameters
 test:
   area: 4 # Which area to use for test, option: 1-6
-  batch_size: 3
-  shuffle: False
-  num_workers: 4
+  batch_size: 25 # batch size during testing
+  npoint: 4096 # [default: 4096]
+  visual: True
+  num_votes: 1
+  logdir: 'pointnet_light_s3dis'
 
   # data parameters
 data:
